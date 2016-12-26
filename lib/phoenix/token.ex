@@ -3,18 +3,20 @@ defmodule Phoenix.Token do
   Tokens provide a way to generate and verify bearer
   tokens for use in Channels or API authentication.
 
-  The data can be read by clients, but the message is
-  signed to prevent tampering.
+  The data stored in the token is signed to prevent tampering
+  but not encrypted. This means it is safe to store identification
+  information (such as user IDs) but should not be used to store
+  confidential information (such as credit card numbers).
 
   ## Example
 
-  When generating a unique token for usage in an API or Channel
-  it is advised to use a unique identifier for the user typically
+  When generating a unique token for use in an API or Channel
+  it is advised to use a unique identifier for the user, typically
   the id from a database. For example:
 
       iex> user_id = 1
-      iex> token = Phoenix.Token.sign(MyApp.Endpoint, "user", user_id)
-      iex> Phoenix.Token.verify(MyApp.Endpoint, "user", token)
+      iex> token = Phoenix.Token.sign(MyApp.Endpoint, "user salt", user_id)
+      iex> Phoenix.Token.verify(MyApp.Endpoint, "user salt", token)
       {:ok, 1}
 
   In that example we have a user's id, we generate a token and
@@ -29,8 +31,18 @@ defmodule Phoenix.Token do
       endpoint stored in the connection
     * `Phoenix.Socket` - where the secret key base is extracted from
       the endpoint stored in the socket
-    * a string, representing the secret key base itself. We recommend
-      a key base with at least 20 characters to provide enough entropy
+    * a string, representing the secret key base itself. A key base
+      with at least 20 randomly generated characters should be used
+      to provide adequate entropy.
+
+  The second argument is a [cryptographic salt](https://en.wikipedia.org/wiki/Salt_(cryptography))
+  which must be the same in both calls to `sign/4` and `verify/4`.
+  For instance, it may be called "user auth" when generating a token
+  that will be used to authenticate users on channels or on your APIs.
+
+  The third argument can be any term (string, int, list, etc.)
+  that you wish to codify into the token. Upon valid verification,
+  this same term will be extracted from the token.
 
   ## Usage
 
@@ -39,14 +51,14 @@ defmodule Phoenix.Token do
   One is via the meta tag:
 
       <%= tag :meta, name: "channel_token",
-                     content: Phoenix.Token.sign(@conn, "user", @current_user.id) %>
+                     content: Phoenix.Token.sign(@conn, "user salt", @current_user.id) %>
 
   Or an endpoint that returns it:
 
       def create(conn, params) do
         user = User.create(params)
         render conn, "user.json",
-               %{token: Phoenix.Token.sign(conn, "user", user.id), user: user}
+               %{token: Phoenix.Token.sign(conn, "user salt", user.id), user: user}
       end
 
   Once the token is sent, the client may now send it back to the server
@@ -58,7 +70,7 @@ defmodule Phoenix.Token do
 
         def connect(%{"token" => token}, socket) do
           # Max age of 2 weeks (1209600 seconds)
-          case Phoenix.Token.verify(socket, "user", token, max_age: 1209600) do
+          case Phoenix.Token.verify(socket, "user salt", token, max_age: 1209600) do
             {:ok, user_id} ->
               socket = assign(socket, :user, Repo.get!(User, user_id))
               {:ok, socket}
@@ -79,15 +91,16 @@ defmodule Phoenix.Token do
   alias Plug.Crypto.MessageVerifier
 
   @doc """
-  Encodes data and signs it resulting in a token you can send down to clients.
+  Encodes data and signs it resulting in a token you can send to clients.
 
   ## Options
+
     * `:key_iterations` - option passed to `Plug.Crypto.KeyGenerator`
       when generating the encryption and signing keys. Defaults to 1000;
     * `:key_length` - option passed to `Plug.Crypto.KeyGenerator`
       when generating the encryption and signing keys. Defaults to 32;
     * `:key_digest` - option passed to `Plug.Crypto.KeyGenerator`
-      when generating the encryption and signing keys. Defaults to `:sha256';
+      when generating the encryption and signing keys. Defaults to `:sha256`;
   """
   def sign(context, salt, data, opts \\ []) when is_binary(salt) do
     secret = get_key_base(context) |> get_secret(salt, opts)
@@ -102,6 +115,41 @@ defmodule Phoenix.Token do
   @doc """
   Decodes the original data from the token and verifies its integrity.
 
+  ## Examples
+
+  In this scenario we will create a token, sign it, then provide it to a client
+  application. The client will then use this token to authenticate requests for
+  resources from the server. (See `Phoenix.Token` summary for more info about
+  creating tokens.)
+
+      iex> user_id    = 99
+      iex> secret     = "kjoy3o1zeidquwy1398juxzldjlksahdk3"
+      iex> user_salt  = "user salt"
+      iex> token      = Phoenix.Token.sign(secret, user_salt, user_id)
+
+  The mechanism for passing the token to the client is typically through a
+  cookie, a JSON response body, or HTTP header. For now, assume the client has
+  received a token it can use to validate requests for protected resources.
+
+  When the server receives a request, it can use `verify/4` to determine if it
+  should provide the requested resources to the client:
+
+      iex> Phoenix.Token.verify(secret, user_salt, token)
+      {:ok, 99}
+
+  In this example, we know the client sent a valid token because `verify/4`
+  returned a tuple of type `{:ok, user_id}`. The server can now proceed with
+  the request.
+
+  However, if the client had sent an expired or otherwise invalid token
+  `verify/4` would have returned an error instead:
+
+      iex> Phoenix.Token.verify(secret, user_salt, expired, max_age: 1209600)
+      {:error, :expired}
+
+      iex> Phoenix.Token.verify(secret, user_salt, invalid)
+      {:error, :invalid}
+
   ## Options
 
     * `:max_age` - verifies the token only if it has been generated
@@ -112,7 +160,7 @@ defmodule Phoenix.Token do
     * `:key_length` - option passed to `Plug.Crypto.KeyGenerator`
       when generating the encryption and signing keys. Defaults to 32;
     * `:key_digest` - option passed to `Plug.Crypto.KeyGenerator`
-      when generating the encryption and signing keys. Defaults to `:sha256';
+      when generating the encryption and signing keys. Defaults to `:sha256`;
 
   """
   def verify(context, salt, token, opts \\ [])
@@ -160,5 +208,5 @@ defmodule Phoenix.Token do
     KeyGenerator.generate(secret_key_base, salt, key_opts)
   end
 
-  defp now_ms, do: System.system_time(:milli_seconds)
+  defp now_ms, do: System.system_time(:milliseconds)
 end

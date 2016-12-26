@@ -140,7 +140,7 @@ defmodule Phoenix.Channel.Server do
     send pid, encoded_msg
     :ok
   end
-  def push(_, _, _, _), do: raise_invalid_message()
+  def push(_, _, _, _, _), do: raise_invalid_message()
 
   @doc """
   Replies to a given ref to the transport process.
@@ -156,6 +156,7 @@ defmodule Phoenix.Channel.Server do
   def reply(_, _, _, _, _), do: raise_invalid_message()
 
 
+  @spec raise_invalid_message() :: no_return()
   defp raise_invalid_message do
     raise ArgumentError, "topic and event must be strings, message must be a map"
   end
@@ -280,6 +281,19 @@ defmodule Phoenix.Channel.Server do
     end)
   end
 
+  @doc false
+  # TODO revisit in future GenServer releases
+  def unhandled_handle_info(msg, state) do
+    proc =
+      case Process.info(self(), :registered_name) do
+        {_, []}   -> self()
+        {_, name} -> name
+      end
+    :error_logger.error_msg('~p ~p received unexpected message in handle_info/2: ~p~n',
+      [__MODULE__, proc, msg])
+    {:noreply, state}
+  end
+
   ## Handle results
 
   defp handle_result({:reply, reply, %Socket{} = socket}, callback) do
@@ -300,11 +314,16 @@ defmodule Phoenix.Channel.Server do
     {:noreply, put_in(socket.ref, nil)}
   end
 
+  defp handle_result({:noreply, socket, timeout_or_hibernate}, _callback) do
+    {:noreply, put_in(socket.ref, nil), timeout_or_hibernate}
+  end
+
   defp handle_result(result, :handle_in) do
     raise """
     Expected `handle_in/3` to return one of:
 
         {:noreply, Socket.t} |
+        {:noreply, Socket.t, timeout | :hibernate} |
         {:reply, {status :: atom, response :: map}, Socket.t} |
         {:reply, status :: atom, Socket.t} |
         {:stop, reason :: term, Socket.t} |
@@ -320,6 +339,7 @@ defmodule Phoenix.Channel.Server do
     Expected `#{callback}` to return one of:
 
         {:noreply, Socket.t} |
+        {:noreply, Socket.t, timeout | :hibernate} |
         {:stop, reason :: term, Socket.t} |
 
     got #{inspect result}

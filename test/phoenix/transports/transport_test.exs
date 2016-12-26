@@ -1,3 +1,5 @@
+System.put_env("TRANSPORT_TEST_HOST", "host.com")
+
 defmodule Phoenix.Transports.TransportTest do
   use ExUnit.Case, async: true
   use RouterHelper
@@ -7,7 +9,7 @@ defmodule Phoenix.Transports.TransportTest do
 
   Application.put_env :phoenix, __MODULE__.Endpoint,
     force_ssl: [],
-    url: [host: "host.com"],
+    url: [host: {:system, "TRANSPORT_TEST_HOST"}],
     check_origin: ["//endpoint.com"]
 
   defmodule Endpoint do
@@ -59,6 +61,10 @@ defmodule Phoenix.Transports.TransportTest do
     conn = check_origin("https://another.com/", [])
     assert conn.halted
     assert conn.status == 403
+  end
+
+  test "can get the host from system variables" do
+    refute check_origin("https://host.com", check_origin: true).halted
   end
 
   test "wildcard subdomains" do

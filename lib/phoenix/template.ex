@@ -1,10 +1,10 @@
 defmodule Phoenix.Template do
   @moduledoc """
-  Templates are used by Phoenix on rendering.
+  Templates are used by Phoenix when rendering responses.
 
-  Since many views require rendering large contents, for example
-  a whole HTML file, it is common to put those files in the file
-  system into a particular directory, typically "web/templates".
+  Since many views render significant content, for example
+  a whole HTML file, it is common to put these files into a particular
+  directory, typically "web/templates".
 
   This module provides conveniences for reading all files from a
   particular directory and embedding them into a single module.
@@ -30,7 +30,7 @@ defmodule Phoenix.Template do
 
   ## Rendering
 
-  In some cases, you will want to overide the `render/2` clause
+  In some cases, you will want to override the `render/2` clause
   to compose the assigns for the template before rendering. In such
   cases, you can render the template directly by calling the generated
   private function `render_template/2`. For example:
@@ -62,7 +62,7 @@ defmodule Phoenix.Template do
     * template path - is the complete path of the template
       in the filesystem, for example, "path/to/users.html.eex"
 
-    * template root - the directory were templates are defined
+    * template root - the directory where templates are defined
 
     * template engine - a module that receives a template path
       and transforms its source code into Elixir quoted expressions.
@@ -71,7 +71,7 @@ defmodule Phoenix.Template do
 
   Phoenix supports custom template engines. Engines tell
   Phoenix how to convert a template path into quoted expressions.
-  Please check `Phoenix.Template.Engine` for more information on
+  See `Phoenix.Template.Engine` for more information on
   the API required to be implemented by custom engines.
 
   Once a template engine is defined, you can tell Phoenix
@@ -121,7 +121,7 @@ defmodule Phoenix.Template do
         <> available_templates(exception.available)
         <> "\nAssigns:\n\n"
         <> inspect(exception.assigns)
-        <> "\n"
+        <> "\n\nAssigned keys: #{inspect Map.keys(exception.assigns)}\n"
     end
 
     defp available_templates([]), do: "No templates were compiled for this module."

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.3-dev
+
+* Enhancements
+  * [Controller] Add `current_path` and `current_url` to generate a connection's path and url
+  * [Channel] Add ability to configure channel event logging with `:log_join` and `:log_handle_in` options
+  * [Channel] Warn on unhandled `handle_info/2` messages
+
+* JavaScript client enhancements
+  * Add ability to pass `encode` and `decode` functions to socket constructor for custom encoding and decoding of outgoing and incoming messages.
+
+## 1.2.1 (2016-8-11)
+
+* Enhancements
+  * [Router] Improve errors for invalid route paths
+  * [Plug] Include new development error pages
+
+* Bug Fixes
+  * [Endpoint] Fixed issue where endpoint would fail to code reload on next request after an endpoint compilation error
 
 ## 1.2.0 (2016-6-23)
 

@@ -6,11 +6,11 @@ defmodule Phoenix.Integration.LongPollTest do
   import ExUnit.CaptureLog
 
   alias Phoenix.Integration.HTTPClient
-  alias Phoenix.Transports.LongPoll
   alias Phoenix.Socket.Broadcast
   alias Phoenix.PubSub.Local
   alias __MODULE__.Endpoint
 
+  @moduletag :capture_log
   @port 5808
   @pool_size 1
 
@@ -23,7 +23,7 @@ defmodule Phoenix.Integration.LongPollTest do
   ])
 
   defmodule RoomChannel do
-    use Phoenix.Channel
+    use Phoenix.Channel, log_join: :info, log_handle_in: :info
 
     intercept ["new_msg"]
 
@@ -119,8 +119,9 @@ defmodule Phoenix.Integration.LongPollTest do
   end
 
   setup do
-    for {_, pid, _, _} <- Supervisor.which_children(LongPoll.Supervisor) do
-      Supervisor.terminate_child(LongPoll.Supervisor, pid)
+    supervisor = Module.concat(Endpoint, "LongPoll.Supervisor")
+    for {_, pid, _, _} <- Supervisor.which_children(supervisor) do
+      Supervisor.terminate_child(supervisor, pid)
     end
     :ok
   end
@@ -216,7 +217,7 @@ defmodule Phoenix.Integration.LongPollTest do
       Phoenix.PubSub.subscribe(__MODULE__, "room:lobby")
       session = join("/ws", "room:lobby", @mode)
 
-      # Publish successfuly
+      # Publish successfully
       resp = poll :post, "/ws", session, %{
         "topic" => "room:lobby",
         "event" => "new_msg",

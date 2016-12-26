@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Phoenix.Gen.ModelTest do
   test "generates model" do
     in_tmp "generates model", fn ->
       Mix.Tasks.Phoenix.Gen.Model.run ["user", "users", "name", "age:integer", "nicks:array:text",
-                                       "famous:boolean", "born_at:datetime", "secret:uuid", "desc:text",
+                                       "famous:boolean", "born_at:naive_datetime", "secret:uuid", "desc:text",
                                        "blob:binary"]
 
       assert [migration] = Path.wildcard("priv/repo/migrations/*_create_user.exs")
@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Phoenix.Gen.ModelTest do
         assert file =~ "add :age, :integer"
         assert file =~ "add :nicks, {:array, :text}"
         assert file =~ "add :famous, :boolean, default: false, null: false"
-        assert file =~ "add :born_at, :datetime"
+        assert file =~ "add :born_at, :naive_datetime"
         assert file =~ "add :secret, :uuid"
         assert file =~ "add :desc, :text"
         assert file =~ "add :blob, :binary"
@@ -46,7 +46,7 @@ defmodule Mix.Tasks.Phoenix.Gen.ModelTest do
         assert file =~ "field :age, :integer"
         assert file =~ "field :nicks, {:array, :string}"
         assert file =~ "field :famous, :boolean, default: false"
-        assert file =~ "field :born_at, Ecto.DateTime"
+        assert file =~ "field :born_at, :naive_datetime"
         assert file =~ "field :secret, Ecto.UUID"
         assert file =~ "field :desc, :string"
         assert file =~ "field :blob, :binary"
@@ -108,6 +108,22 @@ defmodule Mix.Tasks.Phoenix.Gen.ModelTest do
         assert file =~ "schema \"posts\" do"
         assert file =~ "field :title, :string"
         assert file =~ "belongs_to :user, Phoenix.User"
+      end
+    end
+  end
+
+  test "generates belongs_to associations with foreign key provided by user" do
+    in_tmp "generates belongs_to associations", fn ->
+      Mix.Tasks.Phoenix.Gen.Model.run ["Post", "posts", "title", "user:references:users"]
+
+      assert [migration] = Path.wildcard("priv/repo/migrations/*_create_post.exs")
+
+      assert_file migration, fn file ->
+        assert file =~ "add :user_id, references(:users, on_delete: :nothing)"
+      end
+
+      assert_file "web/models/post.ex", fn file ->
+        assert file =~ "belongs_to :user, Phoenix.User, foreign_key: :user_id"
       end
     end
   end
@@ -234,6 +250,24 @@ defmodule Mix.Tasks.Phoenix.Gen.ModelTest do
   test "name is already defined" do
     assert_raise Mix.Error, fn ->
       Mix.Tasks.Phoenix.Gen.Model.run ["Dup", "dups"]
+    end
+  end
+
+  test "table name missing from references" do
+    assert_raise Mix.Error, fn ->
+      Mix.Tasks.Phoenix.Gen.Model.run ["Post", "posts", "user_id:references"]
+    end
+  end
+
+  test "table name is not snake_case and lowercase" do
+    assert_raise Mix.Error, fn ->
+      Mix.Tasks.Phoenix.Gen.Model.run ["Post", "POSTS", "body:text"]
+    end
+  end
+
+  test "table name omitted" do
+    assert_raise Mix.Error, fn ->
+      Mix.Tasks.Phoenix.Gen.Model.run ["Post"]
     end
   end
 

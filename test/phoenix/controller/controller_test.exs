@@ -134,8 +134,8 @@ defmodule Phoenix.Controller.ControllerTest do
 
   test "allow_jsonp/2 returns json when no callback param is present" do
     conn = conn(:get, "/")
-           |> fetch_query_params
-           |> allow_jsonp
+           |> fetch_query_params()
+           |> allow_jsonp()
            |> json(%{foo: "bar"})
     assert conn.resp_body == "{\"foo\":\"bar\"}"
     assert get_resp_content_type(conn) == "application/json"
@@ -144,8 +144,8 @@ defmodule Phoenix.Controller.ControllerTest do
 
   test "allow_jsonp/2 returns json when callback name is left empty" do
     conn = conn(:get, "/?callback=")
-           |> fetch_query_params
-           |> allow_jsonp
+           |> fetch_query_params()
+           |> allow_jsonp()
            |> json(%{foo: "bar"})
     assert conn.resp_body == "{\"foo\":\"bar\"}"
     assert get_resp_content_type(conn) == "application/json"
@@ -282,6 +282,12 @@ defmodule Phoenix.Controller.ControllerTest do
     assert conn.params["_format"] == nil
   end
 
+  test "accepts/2 uses first matching accepts on empty subtype" do
+    conn = accepts with_accept("text/*"), ~w(json text css)
+    assert get_format(conn) == "text"
+    assert conn.params["_format"] == nil
+  end
+
   test "accepts/2 on non-empty */*" do
     # Fallbacks to HTML due to browsers behavior
     conn = accepts with_accept("application/json, */*"), ~w(html json)
@@ -300,11 +306,19 @@ defmodule Phoenix.Controller.ControllerTest do
     conn = accepts with_accept("text/plain, application/json, */*"), ~w(json text)
     assert get_format(conn) == "text"
     assert conn.params["_format"] == nil
+
+    conn = accepts with_accept("text/*, application/*, */*"), ~w(json text)
+    assert get_format(conn) == "text"
+    assert conn.params["_format"] == nil
   end
 
   test "accepts/2 ignores invalid media types" do
     conn = accepts with_accept("foo/bar, bar baz, application/json"), ~w(html json)
     assert get_format(conn) == "json"
+    assert conn.params["_format"] == nil
+
+    conn = accepts with_accept("foo/*, */bar, text/*"), ~w(json html)
+    assert get_format(conn) == "html"
     assert conn.params["_format"] == nil
   end
 
@@ -327,6 +341,14 @@ defmodule Phoenix.Controller.ControllerTest do
 
     conn = accepts with_accept("text/html; q=0.7, application/json; q=0.8"), ~w(html json)
     assert get_format(conn) == "json"
+    assert conn.params["_format"] == nil
+
+    conn = accepts with_accept("text/*; q=0.7, application/json"), ~w(html json)
+    assert get_format(conn) == "json"
+    assert conn.params["_format"] == nil
+
+    conn = accepts with_accept("application/json; q=0.7, text/*; q=0.8"), ~w(json html)
+    assert get_format(conn) == "html"
     assert conn.params["_format"] == nil
 
     exception = assert_raise Phoenix.NotAcceptableError, ~r/no supported media type in accept/, fn ->
@@ -434,5 +456,58 @@ defmodule Phoenix.Controller.ControllerTest do
 
   defp sent_conn do
     conn(:get, "/") |> send_resp(:ok, "")
+  end
+
+  describe "path and url generation" do
+    def url(), do: "https://www.example.com"
+
+    def build_conn_for_path(path) do
+      conn(:get, path)
+      |> fetch_query_params()
+      |> put_private(:phoenix_endpoint, __MODULE__)
+    end
+
+    test "current_path/1 uses the conn's query params" do
+      conn = build_conn_for_path("/")
+      assert current_path(conn) == "/"
+
+      conn = build_conn_for_path("/foo?one=1&two=2")
+      assert current_path(conn) == "/foo?one=1&two=2"
+    end
+
+    test "current_path/2 allows custom query params" do
+      conn = build_conn_for_path("/")
+      assert current_path(conn, %{}) == "/"
+
+      conn = build_conn_for_path("/foo?one=1&two=2")
+      assert current_path(conn, %{}) == "/foo"
+
+      conn = build_conn_for_path("/foo?one=1&two=2")
+      assert current_path(conn, %{three: 3}) == "/foo?three=3"
+    end
+
+    test "current_url/1 with root path includes trailing slash" do
+      conn = build_conn_for_path("/")
+      assert current_url(conn) == "https://www.example.com/"
+    end
+
+    test "current_url/1 users conn's endpoint and query params" do
+      conn = build_conn_for_path("/?foo=bar")
+      assert current_url(conn) == "https://www.example.com/?foo=bar"
+
+      conn = build_conn_for_path("/foo?one=1&two=2")
+      assert current_url(conn) == "https://www.example.com/foo?one=1&two=2"
+    end
+
+    test "current_url/2 allows custom query params" do
+      conn = build_conn_for_path("/")
+      assert current_url(conn, %{}) == "https://www.example.com/"
+
+      conn = build_conn_for_path("/foo?one=1&two=2")
+      assert current_url(conn, %{}) == "https://www.example.com/foo"
+
+      conn = build_conn_for_path("/foo?one=1&two=2")
+      assert current_url(conn, %{three: 3}) == "https://www.example.com/foo?three=3"
+    end
   end
 end

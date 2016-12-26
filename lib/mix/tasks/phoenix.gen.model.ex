@@ -140,6 +140,7 @@ defmodule Mix.Tasks.Phoenix.Gen.Model do
     raise_with_help()
   end
 
+  @spec raise_with_help() :: no_return()
   defp raise_with_help do
     Mix.raise """
     mix phoenix.gen.model expects both singular and plural names
@@ -221,9 +222,6 @@ defmodule Mix.Tasks.Phoenix.Gen.Model do
 
   defp value_to_type(:text), do: :string
   defp value_to_type(:uuid), do: Ecto.UUID
-  defp value_to_type(:date), do: Ecto.Date
-  defp value_to_type(:time), do: Ecto.Time
-  defp value_to_type(:datetime), do: Ecto.DateTime
   defp value_to_type(v) do
     if Code.ensure_loaded?(Ecto.Type) and not Ecto.Type.primitive?(v) do
       Mix.raise "Unknown type `#{v}` given to generator"

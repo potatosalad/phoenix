@@ -39,6 +39,7 @@ defmodule Mix.Tasks.Phoenix.NewTest do
 
       assert_file "photo_blog/config/prod.exs", fn file ->
         assert file =~ "port: 80"
+        assert file =~ ":inet6"
       end
 
       assert_file "photo_blog/lib/photo_blog.ex", ~r/defmodule PhotoBlog do/
@@ -136,11 +137,13 @@ defmodule Mix.Tasks.Phoenix.NewTest do
       # No Brunch
       refute File.read!("photo_blog/.gitignore") |> String.contains?("/node_modules")
       assert_file "photo_blog/config/dev.exs", ~r/watchers: \[\]/
-      assert_file "photo_blog/priv/static/css/app.css"
-      assert_file "photo_blog/priv/static/favicon.ico"
-      assert_file "photo_blog/priv/static/images/phoenix.png"
-      assert_file "photo_blog/priv/static/js/phoenix.js"
-      assert_file "photo_blog/priv/static/js/app.js"
+
+      # No Brunch & No Html
+      refute_file "photo_blog/priv/static/css/app.css"
+      refute_file "photo_blog/priv/static/favicon.ico"
+      refute_file "photo_blog/priv/static/images/phoenix.png"
+      refute_file "photo_blog/priv/static/js/phoenix.js"
+      refute_file "photo_blog/priv/static/js/app.js"
 
       # No Ecto
       config = ~r/config :photo_blog, PhotoBlog.Repo,/
@@ -184,6 +187,19 @@ defmodule Mix.Tasks.Phoenix.NewTest do
                   &refute(&1 =~ ~r"Phoenix.LiveReloader.Socket")
       assert_file "photo_blog/web/views/error_view.ex", ~r".json"
       assert_file "photo_blog/web/router.ex", &refute(&1 =~ ~r"pipeline :browser")
+    end
+  end
+
+  test "new with no_brunch" do
+    in_tmp "new with no_brunch", fn ->
+      Mix.Tasks.Phoenix.New.run([@app_name, "--no-brunch"])
+
+      assert_file "photo_blog/.gitignore"
+      assert_file "photo_blog/priv/static/css/app.css"
+      assert_file "photo_blog/priv/static/favicon.ico"
+      assert_file "photo_blog/priv/static/images/phoenix.png"
+      assert_file "photo_blog/priv/static/js/phoenix.js"
+      assert_file "photo_blog/priv/static/js/app.js"
     end
   end
 
@@ -232,7 +248,7 @@ defmodule Mix.Tasks.Phoenix.NewTest do
 
   test "new inside umbrella" do
     in_tmp "new inside umbrella", fn ->
-      File.write! "mix.exs", umbrella_mixfile_contents
+      File.write! "mix.exs", umbrella_mixfile_contents()
       File.mkdir! "apps"
       File.cd! "apps", fn ->
         Mix.Tasks.Phoenix.New.run([@app_name])
@@ -275,34 +291,6 @@ defmodule Mix.Tasks.Phoenix.NewTest do
       assert_file "custom_path/config/dev.exs", ~r/Tds.Ecto/
       assert_file "custom_path/config/test.exs", ~r/Tds.Ecto/
       assert_file "custom_path/config/prod.secret.exs", ~r/Tds.Ecto/
-
-      assert_file "custom_path/test/support/conn_case.ex", "Ecto.Adapters.SQL.Sandbox.mode"
-      assert_file "custom_path/test/support/channel_case.ex", "Ecto.Adapters.SQL.Sandbox.mode"
-      assert_file "custom_path/test/support/model_case.ex", "Ecto.Adapters.SQL.Sandbox.mode"
-    end
-  end
-
-  test "new with sqlite adapter" do
-    in_tmp "new with sqlite adapter", fn ->
-      project_path = Path.join(File.cwd!, "custom_path")
-      Mix.Tasks.Phoenix.New.run([project_path, "--database", "sqlite"])
-
-      assert_file "custom_path/mix.exs", ~r/:sqlite_ecto/
-
-      assert_file "custom_path/config/dev.exs", fn file ->
-        assert file =~ ~r/Sqlite.Ecto/
-        assert file =~ ~r/database: "db\/custom_path_dev.sqlite"/
-      end
-
-      assert_file "custom_path/config/test.exs", fn file ->
-        assert file =~ ~r/Sqlite.Ecto/
-        assert file =~ ~r/database: "db\/custom_path_test.sqlite"/
-      end
-
-      assert_file "custom_path/config/prod.secret.exs", fn file ->
-        assert file =~ ~r/Sqlite.Ecto/
-        assert file =~ ~r/database: "db\/custom_path_prod.sqlite"/
-      end
 
       assert_file "custom_path/test/support/conn_case.ex", "Ecto.Adapters.SQL.Sandbox.mode"
       assert_file "custom_path/test/support/channel_case.ex", "Ecto.Adapters.SQL.Sandbox.mode"
@@ -394,7 +382,7 @@ defmodule Mix.Tasks.Phoenix.NewTest do
   end
 
   test "invalid options" do
-    assert_raise Mix.Error, "Invalid option: -database", fn ->
+    assert_raise Mix.Error, ~r/Invalid option: -d/, fn ->
       Mix.Tasks.Phoenix.New.run(["valid", "-database", "mysql"])
     end
   end
@@ -410,22 +398,5 @@ defmodule Mix.Tasks.Phoenix.NewTest do
       assert output =~ "mix phoenix.new"
       assert output =~ "Creates a new Phoenix project."
     end
-  end
-
-  defp umbrella_mixfile_contents do
-    """
-defmodule Umbrella.Mixfile do
-  use Mix.Project
-
-  def project do
-    [apps_path: "apps",
-     deps: deps()]
-  end
-
-  defp deps do
-    []
-  end
-end
-    """
   end
 end

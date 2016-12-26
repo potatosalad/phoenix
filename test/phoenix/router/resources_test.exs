@@ -239,7 +239,7 @@ defmodule Phoenix.Router.ResourcesTest do
     end
   end
 
-  test "param option allows default singularlized _id param to be overidden" do
+  test "param option allows default singularlized _id param to be overridden" do
     conn = call(Router, :get, "admin/foo")
     assert conn.status == 200
     assert conn.params["slug"] == "foo"
@@ -256,7 +256,7 @@ defmodule Phoenix.Router.ResourcesTest do
            "/admin/bar/comments/the_key"
   end
 
-  test "resources with :only sets propper match order for :show and :new" do
+  test "resources with :only sets proper match order for :show and :new" do
     conn = call(Router, :get, "members/new")
     assert conn.status == 200
     assert conn.resp_body == "new users"

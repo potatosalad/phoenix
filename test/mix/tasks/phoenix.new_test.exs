@@ -1,12 +1,6 @@
 Code.require_file "../../../installer/lib/phoenix_new.ex", __DIR__
 Code.require_file "../../../installer/test/mix_helper.exs", __DIR__
 
-# Mock live reloading for testing the generated application.
-defmodule Phoenix.LiveReloader do
-  def init(opts), do: opts
-  def call(conn, _), do: conn
-end
-
 # Here we test the installer is up to date.
 defmodule Mix.Tasks.Phoenix.NewTest do
   use ExUnit.Case
@@ -63,6 +57,9 @@ defmodule Mix.Tasks.Phoenix.NewTest do
       {:ok, _} = Application.ensure_all_started(:photo_blog)
       PhotoBlog.Endpoint.call(conn(:get, "/"), [])
       assert File.stat!("web/views/page_view.ex").mtime > @epoch
+
+      # Ensure /priv static files are copied
+      assert File.exists?("priv/static/js/phoenix.js")
 
       # We can run tests too, starting the app.
       assert capture_io(fn ->
